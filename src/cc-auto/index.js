@@ -1,4 +1,5 @@
 const { Chromeless } = require('chromeless')
+const { excelDate, appendCsv } = require('./utils')
 
 // Patient Identification numbers
 const pin_test='11256872'
@@ -50,7 +51,8 @@ async function run(pin) {
   // Open first Patient from search results
   await chromeless
     .click(sel_firstGridCell)
-    .wait(3000)
+  
+  const lookupStart = new Date();
 
   // it may be necessary to skip a the "that's not your patient.... override screen".
   await chromeless
@@ -70,13 +72,21 @@ async function run(pin) {
     .wait(sel_searchInput)
     .wait(sel_firstGridCell)
     .screenshot()
+  const lookupEnd = new Date();
+
+  appendCsv(pin + ".csv", [excelDate(lookupStart), excelDate(lookupEnd), lookupEnd - lookupStart, patientLabsScreenshot])
 
   console.log(patientLabsScreenshot) // prints local file path or S3 url
 
-  // await chromeless.end()
+  if(!debug) await chromeless.end()
+  	
   return chromeless
 }
 
-run(pin_test).catch(console.error.bind(console))
+var args = process.argv.slice(2);
+var pin = args.length > 0 ? args[0] : pin_test;
+var debug = process.argv[1].endsWith("repl.js")
+
+run(pin).catch(console.error.bind(console))
 
 // _.then(function(chromeless){chromeless.end()})
