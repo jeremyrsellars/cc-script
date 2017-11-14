@@ -68,6 +68,7 @@ async function run(pin) {
   const patientLabsScreenshot = await chromeless
     .click(sel_lablist)
     .wait(sel_searchInput)
+    .wait(sel_firstGridCell)
     .screenshot()
 
   console.log(patientLabsScreenshot) // prints local file path or S3 url
