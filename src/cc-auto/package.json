@@ -7,5 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Jeremy R. Sellars",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "chromeless": "^1.3.0"
+  }
 }
