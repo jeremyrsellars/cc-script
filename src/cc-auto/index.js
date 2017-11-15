@@ -1,5 +1,6 @@
+const path = require('path')
 const { Chromeless } = require('chromeless')
-const { excelDate, appendCsv } = require('./utils')
+const { excelDate, appendCsv, writeFile } = require('./utils')
 
 // Patient Identification numbers
 const pin_test='11256872'
@@ -22,21 +23,26 @@ var sel_performOverrideButton = '.v-button-menu-item-button-primary'
 var sel_lablist = 'img[src*="lab-list.svg"'
 var sel_searchInput = '#search-input-prompt'
 
-var fu = 32 | 8 | 40|4;                                                                                                                                                                                           fu = "C" + "C" + fu + "per"+""+"for"+"man"+"ce"
-
 async function run(pin) {
   const chromeless = new Chromeless()
 
+  var t = excelDate().replace(/\/|:/g, "-");
+  var screenshotOptions = function screenshotOptions (name){
+  	var fn = pin + "." + name + "." + t + ".png"
+  	return { filePath: path.join(process.cwd(), fn)}
+  }
+
+
   const loginScreenshot = await chromeless
     .goto('https://clinicalconnect.ca/connect/login')
-    .type('softek1010', 'input[id="login-form-username"]')
-    .type(fu, 'input[id="login-form-password"]')
+    .type(process.env.ccusr, 'input[id="login-form-username"]')
+    .type(process.env.ccpwd, 'input[id="login-form-password"]')
     .type('partners', 'select[class="v-select-select"]')
     .press(key_downArrow)
     .press(key_upArrow)
     .press(key_enter)
     .wait('#header-simple-search')
-    .screenshot()
+    .screenshot(screenshotOptions("login"))
 
   console.log(loginScreenshot) // prints local file path or S3 url
 
@@ -44,7 +50,7 @@ async function run(pin) {
     .type(pin, 'input[id="header-simple-search"]')
     .press(key_enter)
     .wait(sel_firstGridCell)
-    .screenshot()
+    .screenshot(screenshotOptions("patients"))
 
   console.log(patientListScreenshot) // prints local file path or S3 url
 
@@ -63,23 +69,28 @@ async function run(pin) {
 
   const patientScreenshot = await chromeless
     .wait(sel_lablist)
-    .screenshot()
+    .screenshot(screenshotOptions("patient"))
 
   console.log(patientScreenshot) // prints local file path or S3 url
 
-  const patientLabsScreenshot = await chromeless
+  await chromeless
     .click(sel_lablist)
     .wait(sel_searchInput)
     .wait(sel_firstGridCell)
-    .screenshot()
   const lookupEnd = new Date();
 
+  const patientLabsScreenshot = await chromeless
+    .screenshot(screenshotOptions("labs"))
+  const html = await chromeless
+    .html()
+
   appendCsv(pin + ".csv", [excelDate(lookupStart), excelDate(lookupEnd), lookupEnd - lookupStart, patientLabsScreenshot])
+  writeFile(pin + "." + t + ".html", html)
 
   console.log(patientLabsScreenshot) // prints local file path or S3 url
 
   if(!debug) await chromeless.end()
-  	
+
   return chromeless
 }
 

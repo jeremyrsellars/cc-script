@@ -40,8 +40,13 @@ function appendCsv (file, row) {
 	fs.appendFileSync(file, csv(row))
 }
 
+function writeFile (file, contents) {
+	fs.appendFileSync(file, contents)
+}
+
 
 module.exports = {
-excelDate: excelDate,
-appendCsv: appendCsv,
+	excelDate: excelDate,
+	appendCsv: appendCsv,
+	writeFile: writeFile,
 }
