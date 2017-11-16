@@ -1,0 +1,80 @@
+---
+title: "Clinical Connect Performance"
+author: "Jeremy R. Sellars"
+date: "November 16, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#install.packages("chron")
+#install.packages("ggplot2")
+
+library("chron")
+library("ggplot2")
+library(scales)
+library(knitr)
+```
+
+## Day 1 (before CC upgrade)
+
+Here are the results from the first day.  For most of the data, the timeout was 3 minutes (180s), toward the end of the day, I changed it to 7 minutes (420s).
+
+```{r plots, echo=F}
+
+
+parseExcelDate <- function (s) {
+  dtparts = t(as.data.frame(strsplit(as.character(s),' ')))
+  row.names(dtparts) = NULL
+  as.POSIXct(
+    chron(dates=dtparts[,1],times=dtparts[,2],
+          format=c('m/d/y','h:m:s')))
+}
+
+open_003 <- function(csv_path) {
+  names_003 <- c("StartSearch","Search","StartOpen","Open","EndOpen", "screenshot", "Blank")
+  dt <- read.csv(csv_path, header = F, stringsAsFactors = F)
+  colnames(dt) <- names_003
+  dt$Search <- dt$Search/1000 # ms -> s
+  dt$Open <- dt$Open/1000 # ms -> s
+  dt$StartSearch <- parseExcelDate(dt$StartSearch)
+  dt$StartOpen <- parseExcelDate(dt$StartOpen)
+  dt$EndOpen <- parseExcelDate(dt$EndOpen)
+  dt <- dt[,c("StartSearch","Search","StartOpen","Open","EndOpen")]
+}
+
+plot_003 <- function(dt, patient) {
+  cutoff <- data.frame( x = c(min(dt$StartSearch), max(dt$StartSearch)), y = 180, timeout = factor(180) )
+  ggplot(dt) +
+    geom_point(aes(StartSearch, Search, colour="Search")) +
+    geom_point(aes(StartOpen, Open, colour="Open")) +
+    geom_line(aes( x, y, linetype = timeout), cutoff) + 
+    ylab("Seconds") +
+    ggtitle(patient) +
+    scale_x_datetime()
+}
+```
+
+Here is the plot, and a statistical summary for the data for each patient.
+
+```{r echo=F}
+
+tp1_d1 <- open_003("..\\data\\2017-11-15\\tp1.csv")
+plot_003(tp1_d1, "Test Patient")
+summary(tp1_d1)
+kable(tp1_d1[,c("StartSearch","Search","Open")])
+```
+
+-------------
+
+```{r echo=F}
+
+rp1_d1 <- open_003("..\\data\\2017-11-15\\rp1.csv")
+plot_003(rp1_d1, "Real Patient")
+summary(rp1_d1)
+kable(rp1_d1[,c("StartSearch","Search","Open")])
+
+```
