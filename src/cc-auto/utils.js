@@ -37,7 +37,9 @@ function csv (row) {
 }
 
 function appendCsv (file, row) {
-	fs.appendFileSync(file, csv(row))
+	var s = csv(row)
+	fs.appendFileSync(file, s)
+	console.log(s)
 }
 
 function writeFile (file, contents) {

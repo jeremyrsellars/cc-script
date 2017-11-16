@@ -6,15 +6,15 @@ const { excelDate, appendCsv, writeFile } = require('./utils')
 var mvPath = process.env.mv || "C:\\Program Files\\Git\\usr\\bin\\mv.exe"
 var mv = function mv (src, dest){
     if(src == dest || !src || !dest) return src;
-    console.log("Moving " + src + " -> " + dest)
+    // console.log("Moving " + src + " -> " + dest)
     child_process.execFile(mvPath, [src, dest])
     return dest;
 }
 
 var debug = process.argv[1].endsWith("repl.js")
 
-var longTimeout = 180000
-var abortTimeout = longTimeout * 3
+var longTimeout = 60000
+var abortTimeout = longTimeout * 2
 
 var abort = function abort(e) {
   console.error("Something didn't work right.  Aborting: " + !debug)
@@ -25,7 +25,7 @@ var abort = function abort(e) {
 
 const unhandledRejectionOnlyOnce = process.on('unhandledRejection', (reason, p) => {
   console.log('Unhandled Rejection at: Promise', p, 'reason:', reason)
-  abort(e)
+  abort(reason)
 });
 
 // Patient Identification numbers
@@ -52,14 +52,18 @@ var sel_searchInput = '#search-input-prompt'
 async function run(pin) {
   const chromeless = new Chromeless({waitTimeout:longTimeout})
   var lastScreenShotPathUglyHack = ''
+  var finalScreenShotPath = null
   var screenshotIndex = 0;
+
+  var setFinalScreenShotPath = (p) => {
+    if(p) finalScreenShotPath = p
+  }
 
   var t = excelDate().replace(/\/|:/g, "-");
   var screenshotOptions = function screenshotOptions (name){
     var fn = name + "." + t + ".png"
     var fp = path.join(process.cwd(), fn)
     lastScreenShotPathUglyHack = fp
-    console.log(fp)
     return { filePath: fp}
   }
   
@@ -75,7 +79,7 @@ async function run(pin) {
     .wait('#header-simple-search')
     .screenshot(null, screenshotOptions(pin + "." + screenshotIndex++ + ".login"))
     .catch(abort)
-  loginScreenshot = mv(loginScreenshot, lastScreenShotPathUglyHack)
+  setFinalScreenShotPath(loginScreenshot = mv(loginScreenshot, lastScreenShotPathUglyHack))
 
   console.log(loginScreenshot) // prints local file path or S3 url
   
@@ -84,15 +88,19 @@ async function run(pin) {
     .type(pin, 'input[id="header-simple-search"]')
     .press(key_enter)
     .wait(sel_firstGridCell)
+    .wait(100) // 1/10th of a second to let it paint.
     .screenshot(null, screenshotOptions(pin + "." + screenshotIndex++ + ".patients"))
     .catch(abort)
-  patientListScreenshot = mv(patientListScreenshot, lastScreenShotPathUglyHack)
+  const searchEnd = new Date();
+
+  setFinalScreenShotPath(patientListScreenshot = mv(patientListScreenshot, lastScreenShotPathUglyHack))
   
   console.log(patientListScreenshot) // prints local file path or S3 url
 
   // Open first Patient from search results
   await chromeless
     .wait(sel_firstGridCell)
+    .wait(1000) // 1 second to let it paint.
     .click(sel_firstGridCell)
     .catch(abort)
   
@@ -110,11 +118,12 @@ async function run(pin) {
     .wait(sel_lablist)
     .screenshot(null, screenshotOptions(pin + "." + screenshotIndex++ + ".patient"))
     .catch(abort)
-  patientScreenshot = mv(patientScreenshot, lastScreenShotPathUglyHack)
+  setFinalScreenShotPath(patientScreenshot = mv(patientScreenshot, lastScreenShotPathUglyHack))
 
   console.log(patientScreenshot) // prints local file path or S3 url
 
   await chromeless
+    .wait(100) // 1/10th of a second to let it paint.
     .click(sel_lablist)
     .wait(sel_searchInput)
     .wait(sel_firstGridCell)
@@ -125,18 +134,19 @@ async function run(pin) {
     .wait(100) // 1/10th of a second to let it paint.
     .screenshot(null, screenshotOptions(pin + "." + screenshotIndex++ + ".labs"))
     .catch(abort)
-  patientLabsScreenshot = mv(patientLabsScreenshot, lastScreenShotPathUglyHack)
+  setFinalScreenShotPath(patientLabsScreenshot = mv(patientLabsScreenshot, lastScreenShotPathUglyHack))
+
   const html = await chromeless
     .html()
     .catch(abort)
 
   appendCsv(pin + ".csv",
     [excelDate(searchStart),
-     lookupStart - searchStart,
+     searchEnd - searchStart,
      excelDate(lookupStart),
      lookupEnd - lookupStart,
      excelDate(lookupEnd),
-     patientLabsScreenshot])
+     finalScreenShotPath])
   writeFile(pin + "." + t + ".html", html)
 
   console.log(patientLabsScreenshot) // prints local file path or S3 url
