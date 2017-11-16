@@ -13,8 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 #install.packages("chron")
 #install.packages("ggplot2")
 
-library("chron")
-library("ggplot2")
+library(chron)
+library(ggplot2)
 library(scales)
 library(knitr)
 ```
@@ -29,9 +29,9 @@ Here are the results from the first day.  For most of the data, the timeout was 
 parseExcelDate <- function (s) {
   dtparts = t(as.data.frame(strsplit(as.character(s),' ')))
   row.names(dtparts) = NULL
-  as.POSIXct(
+  as.POSIXlt(
     chron(dates=dtparts[,1],times=dtparts[,2],
-          format=c('m/d/y','h:m:s')))
+          format=c('m/d/y','h:m:s')), tz="UTC")
 }
 
 open_003 <- function(csv_path) {
