@@ -48,6 +48,7 @@ var sel_performOverrideButton = '.v-button-menu-item-button-primary'
 // Patient Dashboard
 var sel_lablist = 'img[src*="lab-list.svg"]'
 var sel_searchInput = '#search-input-prompt'
+var sel_labs = sel_firstGridCell + ", div.module-view div div.clinical-label.v-label-view-text"
 
 async function run(pin) {
   const chromeless = new Chromeless({waitTimeout:longTimeout})
@@ -126,7 +127,7 @@ async function run(pin) {
     .wait(100) // 1/10th of a second to let it paint.
     .click(sel_lablist)
     .wait(sel_searchInput)
-    .wait(sel_firstGridCell)
+    .wait(sel_labs)
     .catch(abort)
   const lookupEnd = new Date();
 
