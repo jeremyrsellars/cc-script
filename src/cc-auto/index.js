@@ -43,7 +43,7 @@ const key_enter = 13
 // Patient Search Results:
 var sel_firstGridCell = 'tbody.v-grid-body td'
 // Patient Search - Select patient Override screen:
-var sel_overrideOther = '#gwt-uid-15'
+var sel_overrideOther = '.override-options :last-child input'
 var sel_performOverrideButton = '.v-button-menu-item-button-primary'
 // Patient Dashboard
 var sel_lablist = 'img[src*="lab-list.svg"]'
@@ -84,12 +84,17 @@ async function run(pin) {
 
   console.log(loginScreenshot) // prints local file path or S3 url
   
+  var wait = 1000;   // a second to let it paint.
   const searchStart = new Date();
   var patientListScreenshot = await chromeless
+    .wait(wait/2)
+    .wait(     'input[id="header-simple-search"]')
+    .click(    'input[id="header-simple-search"]')
     .type(pin, 'input[id="header-simple-search"]')
+    .wait(wait/2)
     .press(key_enter)
     .wait(sel_firstGridCell)
-    .wait(100) // 1/10th of a second to let it paint.
+    .wait(wait)
     .screenshot(null, screenshotOptions(pin + "." + screenshotIndex++ + ".patients"))
     .catch(abort)
   const searchEnd = new Date();
@@ -101,7 +106,7 @@ async function run(pin) {
   // Open first Patient from search results
   await chromeless
     .wait(sel_firstGridCell)
-    .wait(1000) // 1 second to let it paint.
+    .wait(3000) // 1 second to let it paint.
     .click(sel_firstGridCell)
     .catch(abort)
   
@@ -143,7 +148,7 @@ async function run(pin) {
 
   appendCsv(pin + ".csv",
     [excelDate(searchStart),
-     searchEnd - searchStart,
+     searchEnd - searchStart - (2 * wait),
      excelDate(lookupStart),
      lookupEnd - lookupStart,
      excelDate(lookupEnd),
