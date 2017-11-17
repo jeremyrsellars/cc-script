@@ -13,8 +13,8 @@ var mv = function mv (src, dest){
 
 var debug = process.argv[1].endsWith("repl.js")
 
-var longTimeout = 60000
-var abortTimeout = longTimeout * 2
+var longTimeout = 840000
+var abortTimeout = longTimeout * 0.2
 
 var abort = function abort(e) {
   console.error("Something didn't work right.  Aborting: " + !debug)
@@ -111,14 +111,15 @@ async function run(pin) {
     .catch(abort)
   
   const lookupStart = new Date();
+  console.log('lookupStart:' + lookupStart);
 
   // it may be necessary to skip a the "that's not your patient.... override screen".
   await chromeless
-    .wait(sel_overrideOther)
-    .click(sel_overrideOther)
-    .wait(sel_performOverrideButton)
-    .click(sel_performOverrideButton)
-    .catch(abort)
+    .wait(sel_overrideOther, 20000)
+    .click(sel_overrideOther, 20000)
+    .wait(sel_performOverrideButton, 20000)
+    .click(sel_performOverrideButton, 20000)
+    .catch(function(){})
   
   var patientScreenshot = await chromeless
     .wait(sel_lablist)
@@ -132,14 +133,15 @@ async function run(pin) {
     .wait(100) // 1/10th of a second to let it paint.
     .click(sel_lablist)
     .wait(sel_searchInput)
-    .wait(sel_labs)
-    .catch(abort)
-  const lookupEnd = new Date();
+    .wait(sel_firstGridCell)
+    .catch(abort);
 
   var patientLabsScreenshot = await chromeless
     .wait(100) // 1/10th of a second to let it paint.
     .screenshot(null, screenshotOptions(pin + "." + screenshotIndex++ + ".labs"))
     .catch(abort)
+  const lookupEnd = new Date();
+  console.log('lookupEnd:' + lookupEnd);
   setFinalScreenShotPath(patientLabsScreenshot = mv(patientLabsScreenshot, lastScreenShotPathUglyHack))
 
   const html = await chromeless
