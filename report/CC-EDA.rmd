@@ -1,10 +1,10 @@
 ---
 title: "Clinical Connect Performance"
 author: "Jeremy R. Sellars"
-date: "November 16, 2017"
+date: "November 20, 2017"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -19,9 +19,22 @@ library(scales)
 library(knitr)
 ```
 
-## Day 1 (before CC upgrade)
+# Executive Summary
 
-Here are the results from the first day.  For most of the data, the timeout was 3 minutes (180s), toward the end of the day, I changed it to 7 minutes (420s).
+This report contains information gathered by Softek, using web-automation tooling to drive the Clinical Connect UI, searching for a patient, opening the patient, and waiting for the labs to be available.
+
+## Findings
+
+* The ClinicalConnect application seems to be subject to timeouts, during both peak and off-peak hours.
+* The problem may be related to the amount of data being retrieved.  E.g. Labs for All Regional Encounters for the past 180 days may retrieve more data than just the current encounter for the past 90 days.
+
+
+## Response time-to-glass visualization
+
+Here are the timing results for 2 operations, starting on the fourth day of the engagement.  For details, see the Test Methods section.
+
+1. Search -- Type the patient PIN into the header search box and press enter.
+2. Open -- Click the patient's row in the grid, click through not-my-patient override, and wait for labs.
 
 ```{r plots, echo=F}
 
@@ -47,14 +60,20 @@ open_003 <- function(csv_path) {
 }
 
 plot_003 <- function(dt, patient) {
-  cutoff <- data.frame( x = c(min(dt$StartSearch), max(dt$StartSearch)), y = 180, timeout = factor(180) )
+  timeout=600
+  show_timeout <- max(dt[,c("Search","Open")]) > 600
+  cutoff <- data.frame( x = c(min(dt$StartSearch), max(dt$StartSearch)), y = timeout, timeout = factor(timeout))
+  ggp <-
   ggplot(dt) +
     geom_point(aes(StartSearch, Search, colour="Search")) +
-    geom_point(aes(StartOpen, Open, colour="Open")) +
-    geom_line(aes( x, y, linetype = timeout), cutoff) + 
+    geom_point(aes(StartOpen, Open, colour="Open"))
+  if(show_timeout) ggp <- ggp +
+    geom_line(aes( x, y, linetype = timeout), cutoff)
+  ggp <- ggp + 
     ylab("Seconds") +
     ggtitle(patient) +
     scale_x_datetime()
+  ggp
 }
 ```
 
@@ -62,19 +81,38 @@ Here is the plot, and a statistical summary for the data for each patient.
 
 ```{r echo=F}
 
-tp1_d1 <- open_003("..\\data\\2017-11-15\\tp1.csv")
+tp1_d1 <- open_003("..\\data\\AllRegionalEncounters_180d\\tp1.csv")
 plot_003(tp1_d1, "Test Patient")
-summary(tp1_d1)
-kable(tp1_d1[,c("StartSearch","Search","Open")])
+summary(tp1_d1[,c("StartSearch","Search","Open")])
+#kable(tp1_d1[,c("StartSearch","Search","Open")])
 ```
 
 -------------
 
+### Real Patient
+
+This shows the Search and Open timing for a real patient.  The ClinicalConnect UI seems to timeout after 10 minutes (600s), presumably because it is waiting for data from the server.
+
 ```{r echo=F}
 
-rp1_d1 <- open_003("..\\data\\2017-11-15\\rp1.csv")
+rp1_d1 <- open_003("..\\data\\AllRegionalEncounters_180d\\rp1.csv")
 plot_003(rp1_d1, "Real Patient")
-summary(rp1_d1)
-kable(rp1_d1[,c("StartSearch","Search","Open")])
+summary(rp1_d1[,c("StartSearch","Search","Open")])
+#kable(rp1_d1[,c("StartSearch","Search","Open")])
 
 ```
+
+----------
+
+# Test Methods
+
+The ClinicalConnect web application was automated through Chrome, running on the Panther server in one of LHSC's data centers.
+
+1. Login. ![Login](..\\data\\AllRegionalEncounters_180d\\tp.0.login.11-17-2017 14-56-05.png)
+2. Search for a patient by PIN.  ![Search](..\\data\\AllRegionalEncounters_180d\\tp.1.patients.11-17-2017 14-56-05.png)
+3. Open patient.  Click through the not-my-patient override screen. (Not shown)
+5. Showing Labs.  ![Labs](..\\data\\AllRegionalEncounters_180d\\tp.3.labs.11-17-2017 14-56-05.png)
+
+The labs were set through settings to 180 days of All Regional Encounters, as shown here:
+
+![Settings](..\\data\\AllRegionalEncounters_180d\\AllRegionalEncounters_180d.png)
