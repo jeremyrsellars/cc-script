@@ -49,6 +49,7 @@ var sel_performOverrideButton = '.v-button-menu-item-button-primary'
 var sel_lablist = 'img[src*="lab-list.svg"]'
 var sel_searchInput = '#search-input-prompt'
 var sel_labs = sel_firstGridCell + ", div.module-view div div.clinical-label.v-label-view-text"
+var sel_error = ".v-label-error"
 
 async function run(pin) {
   const chromeless = new Chromeless({waitTimeout:longTimeout})
@@ -148,20 +149,41 @@ async function run(pin) {
     .html()
     .catch(abort)
 
+  var error = await chromeless.exists(sel_error)
+
+  if(error){
+    var errorScreenShot = await chromeless
+      .wait(100) // 1/10th of a second to let it paint.
+      .screenshot(sel_error, screenshotOptions(pin + "." + screenshotIndex++ + ".error"))
+      .catch(abort)
+    errorScreenShot = mv(errorScreenShot, lastScreenShotPathUglyHack)
+
+    var errorMessages = await chromeless.evaluate(() => {
+      // this will be executed in Chrome
+      const msgs = [].map.call(
+        document.querySelectorAll('.v-label-error'),
+        div => (div.innerText)
+      )
+      return msgs.join(" ...... ")
+    })
+  }
+
   appendCsv(pin + ".csv",
     [excelDate(searchStart),
      searchEnd - searchStart - (2 * wait),
      excelDate(lookupStart),
      lookupEnd - lookupStart,
      excelDate(lookupEnd),
-     finalScreenShotPath])
+     finalScreenShotPath,
+     errorMessages,
+     errorScreenShot])
   writeFile(pin + "." + t + ".html", html)
 
   console.log(patientLabsScreenshot) // prints local file path or S3 url
 
   if(!debug) await chromeless.end()
 
-    return chromeless
+  return chromeless
 }
 
 var args = process.argv.slice(2);
