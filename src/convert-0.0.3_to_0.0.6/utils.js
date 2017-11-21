@@ -43,8 +43,8 @@ function appendCsv (file, row) {
 }
 
 function appendCsv2 (file, initalCsv, additionalFields) {
-    var s = csv(additionalFields)
-    fs.appendFileSync(file, initalCsv + s)
+    var s = initalCsv + csv(additionalFields)
+    fs.appendFileSync(file, s)
     console.log(s)
 }
 
@@ -52,14 +52,15 @@ function writeFile (file, contents) {
 	fs.appendFileSync(file, contents)
 }
 
-function readFile (file, contents) {
-    fs.appendFileSync(file, contents)
+function readFile (file) {
+    return fs.readFileSync(file, 'utf8')
 }
 
 
 module.exports = {
 	excelDate: excelDate,
 	appendCsv: appendCsv,
+	appendCsv2: appendCsv2,
     writeFile: writeFile,
     readFile: readFile,
 }
