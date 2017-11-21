@@ -1,6 +1,6 @@
 ---
 title: "Clinical Connect Performance"
-author: "Jeremy R. Sellars"
+author: "Jeremy R. Sellars - Softek Solutions"
 date: "November 20, 2017"
 output:
   pdf_document: default
@@ -29,12 +29,14 @@ This report contains information gathered by Softek, using web-automation toolin
 * The problem may be related to the amount of data being retrieved.  E.g. Labs for All Regional Encounters for the past 180 days may retrieve more data than just the current encounter for the past 90 days.
 
 
-## Response time-to-glass visualization
+\pagebreak
+
+# Response time-to-glass visualization
 
 Here are the timing results for 2 operations, starting on the fourth day of the engagement.  For details, see the Test Methods section.
 
-1. Search -- Type the patient PIN into the header search box and press enter.
-2. Open -- Click the patient's row in the grid, click through not-my-patient override, and wait for labs.
+1. Search - Type the patient PIN into the header search box and press enter.
+2. Open - Click the patient's row in the grid, click through not-my-patient override, and wait for labs.
 
 ```{r plots, echo=F}
 
@@ -61,10 +63,10 @@ open_003 <- function(csv_path) {
 
 plot_003 <- function(dt, patient) {
   timeout=600
-  show_timeout <- max(dt[,c("Search","Open")]) > 600
+  show_timeout <- T # max(dt[,c("Search","Open")]) > 600
   cutoff <- data.frame( x = c(min(dt$StartSearch), max(dt$StartSearch)), y = timeout, timeout = factor(timeout))
   ggp <-
-  ggplot(dt) +
+    ggplot(dt) +
     geom_point(aes(StartSearch, Search, colour="Search")) +
     geom_point(aes(StartOpen, Open, colour="Open"))
   if(show_timeout) ggp <- ggp +
@@ -75,19 +77,69 @@ plot_003 <- function(dt, patient) {
     scale_x_datetime()
   ggp
 }
+
+
+hist_003 <- function(dt, patient) {
+  timeout=600
+  show_timeout <- max(dt[,c("Search","Open")]) > 600
+  cutoff <- data.frame( x = c(min(dt$StartSearch), max(dt$StartSearch)), y = timeout, timeout = factor(timeout))
+  sTemp <- as.data.frame(dt$Search / 60)
+  colnames(sTemp) <- "Minutes"
+  sTemp$Operation = "Search"
+  oTemp <- as.data.frame(dt$Open / 60)
+  colnames(oTemp) <- "Minutes"
+  oTemp$Operation = "Open"
+  
+  opTimes <- as.data.frame(rbind(sTemp, oTemp))
+  ggp <-
+    ggplot(opTimes) +
+    geom_histogram(alpha = 0.5, binwidth=0.5, aes(Minutes, fill=Operation, color=Operation), position = 'identity')
+  
+  ggp <- ggp + 
+    ggtitle(paste(patient, "Response - Time Histogram"))
+  ggp
+}
+#hist_003(rp1_d1, "Hi")
+
+summarize <- function (dt){
+  total = nrow(dt)
+  timeouts = nrow(dt[which(dt$Open >= 600),])
+  successes = total - timeouts
+  smry <- as.data.frame(list(
+    count=nrow(dt),
+    OpenSuccess=successes,
+    OpenTimeouts=timeouts,
+    OpenTimeoutPercent=paste0(floor(100*timeouts/total), "%")))
+  colnames(smry) <- c("Sample Count (Open Patient w/ Labs)", "Success", "Timeout", "Timeout %")
+  smry
+}
 ```
 
 Here is the plot, and a statistical summary for the data for each patient.
 
+-------------
+
+\pagebreak
+
+### Test Patient
+
 ```{r echo=F}
 
 tp1_d1 <- open_003("..\\data\\AllRegionalEncounters_180d\\tp1.csv")
-plot_003(tp1_d1, "Test Patient")
-summary(tp1_d1[,c("StartSearch","Search","Open")])
-#kable(tp1_d1[,c("StartSearch","Search","Open")])
+section_dt <- tp1_d1
+section_title <- "Test Patient"
+
+section_dt <- section_dt[which(section_dt$Search < 30),] # Remove probable outlier/automation mistake
+kable(summarize(section_dt))
+plot_003(section_dt, section_title)
+#hist_003(section_dt, section_title)
+kable(summary(section_dt[,c("StartSearch","Search","Open")]))
+#kable(section_dt[,c("StartSearch","Search","Open")])
 ```
 
 -------------
+
+\pagebreak
 
 ### Real Patient
 
@@ -96,22 +148,34 @@ This shows the Search and Open timing for a real patient.  The ClinicalConnect U
 ```{r echo=F}
 
 rp1_d1 <- open_003("..\\data\\AllRegionalEncounters_180d\\rp1.csv")
-plot_003(rp1_d1, "Real Patient")
-summary(rp1_d1[,c("StartSearch","Search","Open")])
-#kable(rp1_d1[,c("StartSearch","Search","Open")])
+rp1_d1 <- rp1_d1[which(rp1_d1$Open < 1000),] # Remove probable outlier
+section_dt <- rp1_d1
+section_title <- "Real Patient"
 
+section_dt <- section_dt[which(section_dt$Search < 30),] # Remove probable outlier/automation mistake
+kable(summarize(section_dt))
+plot_003(section_dt, section_title)
+#hist_003(section_dt, section_title)
+kable(summary(section_dt[,c("StartSearch","Search","Open")]))
+#kable(section_dt[,c("StartSearch","Search","Open")])
 ```
 
 ----------
 
-# Test Methods
+\pagebreak
+
+# Test Method
 
 The ClinicalConnect web application was automated through Chrome, running on the Panther server in one of LHSC's data centers.
 
-1. Login. ![Login](..\\data\\AllRegionalEncounters_180d\\tp.0.login.11-17-2017 14-56-05.png)
-2. Search for a patient by PIN.  ![Search](..\\data\\AllRegionalEncounters_180d\\tp.1.patients.11-17-2017 14-56-05.png)
-3. Open patient.  Click through the not-my-patient override screen. (Not shown)
-5. Showing Labs.  ![Labs](..\\data\\AllRegionalEncounters_180d\\tp.3.labs.11-17-2017 14-56-05.png)
+1. Login.
+  * ![Login](..\\data\\AllRegionalEncounters_180d\\tp.0.login.11-17-2017 14-56-05.png)
+2. Search for a patient by PIN.
+  * ![Search](..\\data\\AllRegionalEncounters_180d\\tp.1.patients.11-17-2017 14-56-05.png)
+3. Open patient.  Click through the not-my-patient override screen.
+  * (Not shown)
+4. Showing Labs.
+  * ![Labs](..\\data\\AllRegionalEncounters_180d\\tp.3.labs.11-17-2017 14-56-05.png)
 
 The labs were set through settings to 180 days of All Regional Encounters, as shown here:
 
