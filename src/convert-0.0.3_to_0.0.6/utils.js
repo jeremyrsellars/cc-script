@@ -44,7 +44,7 @@ function appendCsv (file, row) {
 
 function appendCsv2 (file, initalCsv, additionalFields) {
     var s = csv(additionalFields)
-    fs.appendFileSync(file, initalCsv + "," + s)
+    fs.appendFileSync(file, initalCsv + s)
     console.log(s)
 }
 
