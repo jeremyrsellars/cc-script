@@ -3,9 +3,9 @@ title: "Clinical Connect Performance"
 author: "Jeremy R. Sellars - Softek Solutions"
 date: "November 22, 2017"
 output:
+  word_document: default
   html_document: default
   pdf_document: default
-  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -40,7 +40,7 @@ The data is from part of Friday November 18th, through part of Wednesday Novembe
 
 * The ClinicalConnect application seems to be subject to timeouts, during both peak and off-peak hours.
 * The problem may be related to the amount of data being retrieved.  E.g. Labs for All Regional Encounters for the past 180 days may retrieve more data than just the current encounter for the past 90 days.
-* The ClinicalConnect application success/failure behavior seemed to drasticly improve starting onday November 20th.
+* The ClinicalConnect application success/failure behavior seemed to drasticly improve starting Monday November 20th.
 
 \pagebreak
 
@@ -184,11 +184,11 @@ summarize <- function (dt){
 }
 ```
 
-Here is the plot, and a statistical summary for the data for each patient.
+Plots and statistical analysis are presented for both a real patient and a test patient for comparison.
 
 \pagebreak
 
-### Real Patient
+## Real Patient
 
 This shows the Search and Open timing for a real patient.  The ClinicalConnect UI seems to timeout when a request takes longer than 10 minutes (600s), presumably because it is waiting for data from the server.
 
@@ -216,7 +216,7 @@ kable(summary(section_dt[,c("StartSearch","Search","Open")]))
 
 \pagebreak
 
-### Test Patient
+## Test Patient
 
 ```{r echo=F, fig.width=10}
 
