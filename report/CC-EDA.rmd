@@ -182,16 +182,19 @@ Here is the plot, and a statistical summary for the data for each patient.
 
 \pagebreak
 
-### Test Patient
+### Real Patient
+
+This shows the Search and Open timing for a real patient.  The ClinicalConnect UI seems to timeout when a request takes longer than 10 minutes (600s), presumably because it is waiting for data from the server.
 
 ```{r echo=F, fig.width=10}
 
-#tp1_d1 <- open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\tp1.csv")
-tp1_d1 <- rbind(
-  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\tp1.csv"),
-  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\part2\\tp1.csv"))
-section_dt <- tp1_d1
-section_title <- "Test Patient"
+#rp1_d1 <- open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\rp1.csv")
+rp1_d1 <- rbind(
+  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\rp1.csv"),
+  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\part2\\rp1.csv"))
+rp1_d1 <- rp1_d1[which(rp1_d1$Open < 750),] # Remove probable outlier
+section_dt <- rp1_d1
+section_title <- "Real Patient"
 
 section_dt$Status <- as.factor(section_dt$Status)
 section_dt <- section_dt[which(section_dt$Search < 30),] # Remove probable outlier/automation mistake
@@ -209,19 +212,16 @@ samples_plot_006(section_dt, section_title)
 
 \pagebreak
 
-### Real Patient
-
-This shows the Search and Open timing for a real patient.  The ClinicalConnect UI seems to timeout after 10 minutes (600s), presumably because it is waiting for data from the server.
+### Test Patient
 
 ```{r echo=F, fig.width=10}
 
-#rp1_d1 <- open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\rp1.csv")
-rp1_d1 <- rbind(
-  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\rp1.csv"),
-  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\part2\\rp1.csv"))
-rp1_d1 <- rp1_d1[which(rp1_d1$Open < 750),] # Remove probable outlier
-section_dt <- rp1_d1
-section_title <- "Real Patient"
+#tp1_d1 <- open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\tp1.csv")
+tp1_d1 <- rbind(
+  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\tp1.csv"),
+  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\part2\\tp1.csv"))
+section_dt <- tp1_d1
+section_title <- "Test Patient"
 
 section_dt$Status <- as.factor(section_dt$Status)
 section_dt <- section_dt[which(section_dt$Search < 30),] # Remove probable outlier/automation mistake
