@@ -1,8 +1,9 @@
 ---
 title: "Clinical Connect Performance"
 author: "Jeremy R. Sellars - Softek Solutions"
-date: "November 21, 2017"
+date: "November 22, 2017"
 output:
+  pdf_document: default
   html_document: default
 ---
 
@@ -11,11 +12,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #install.packages("chron")
 #install.packages("ggplot2")
+#install.packages("dplyr")
+#install.packages("DBI")
+#install.packages("dplyr")
+#install.packages("backports", type="source")
+#install.packages("rmarkdown")
+
+#install.packages("devtools")
+#require(devtools)
+#install_version("backports", version = "1.1.0")
 
 library(chron)
 library(ggplot2)
 library(scales)
 library(knitr)
+library(dplyr)
 ```
 
 # Executive Summary
@@ -50,7 +61,7 @@ parseExcelDate <- function (s) {
 }
 
 open_006 <- function(csv_path) {
-  names_006 <- c("StartSearch","Search","StartOpen","Open","EndOpen", "screenshot", "ErrorMessage", "Blank1", "Blank")
+  names_006 <- c("StartSearch","Search","StartOpen","Open","EndOpen", "screenshot", "Status", "Blank1", "Blank")
   dt <- read.csv(csv_path, header = F, stringsAsFactors = F)
   colnames(dt) <- names_006
   dt$Search <- dt$Search/1000 # ms -> s
@@ -58,12 +69,22 @@ open_006 <- function(csv_path) {
   dt$StartSearch <- parseExcelDate(dt$StartSearch)
   dt$StartOpen <- parseExcelDate(dt$StartOpen)
   dt$EndOpen <- parseExcelDate(dt$EndOpen)
-  dt$ErrorMessage <- gsub(" ?\\..*", "", dt$ErrorMessage, perl=T)
-  dt$ErrorMessage <- ifelse(is.na(dt$ErrorMessage), "", dt$ErrorMessage)
-  dt$ErrorMessage <- ifelse(dt$ErrorMessage == "", "Opened Successfully", dt$ErrorMessage)
+  dt$Status <- gsub(" ?[-.].*", "", dt$Status, perl=T)
+  dt$Status <- ifelse(is.na(dt$Status), "", dt$Status)
+  dt$Status <- ifelse(dt$Status == "", "Opened Successfully", dt$Status)
 
-  dt <- dt[,c("StartSearch","Search","StartOpen","Open","EndOpen", "ErrorMessage")]
+  dt <- dt[,c("StartSearch","Search","StartOpen","Open","EndOpen", "Status")]
 }
+
+StatusColors <- c(
+      "Opened Successfully"="#0072B2",
+      "Search"="#999999",
+      "Request timed out: LTVH"="#A69F00",
+      "Data failed to retrieve from LTVH"="#E69F00",
+      "Error 007: An unknown error has occurred"="#F0E442",
+      "#0072B2",
+      "#D55E00",
+      "#CC79A7")
 
 plot_006 <- function(dt, patient) {
   timeout=600
@@ -72,25 +93,32 @@ plot_006 <- function(dt, patient) {
   ggp <-
     ggplot(dt) +
     geom_point(aes(StartSearch, Search, colour="Search")) +
-    geom_point(aes(StartOpen, Open, colour=ErrorMessage))
+    geom_point(aes(StartOpen, Open, colour=Status))
   if(show_timeout) ggp <- ggp +
     geom_line(aes( x, y, linetype = timeout), cutoff)
   ggp <- ggp + 
     ylab("Seconds") +
-    ggtitle(patient) +
+    ggtitle("Response Times", patient) +
     scale_x_datetime() +
-    scale_color_manual(values=c(
-      "Opened Successfully"="#009E73",
-      "Search"="#999999",
-      "Request timed out: LTVH"="#F02442",
-      "Data failed to retrieve from LTVH"="#E69F00",
-      "#F0E442",
-      "#0072B2",
-      "#D55E00",
-      "#CC79A7"))
+    scale_color_manual(values=StatusColors)
   ggp
 }
-
+  
+samples_plot_006 <- function(dt, patient) {
+  dt <- dt[,c("StartSearch","Status")]
+  dt$StartSearch <- gsub(" .*", "", as.POSIXct(dt$StartSearch))
+  
+  ggplot(dt %>% count(StartSearch, Status) %>%    # Group by date and message, then count number in each group
+           mutate(pct=n/sum(n),               # Calculate percent within each day
+                  ypos = cumsum(n) - 0.5*n),  # Calculate label positions
+         aes(StartSearch, n, fill=Status)) +
+    geom_bar(stat="identity") +
+    geom_text(aes(label=ifelse(pct*100 > 2, paste0(sprintf("%1.1f", pct*100),"%"), "")),
+              color="#FFFFFF",
+              position=position_stack(vjust=0.5)) +
+    scale_fill_manual(values=StatusColors) +
+    ggtitle("Test results by day", patient)
+}
 
 hist_006 <- function(dt, patient) {
   timeout=600
@@ -115,16 +143,16 @@ hist_006 <- function(dt, patient) {
 #hist_006(rp1_d1, "Hi")
 
 open_hist_006 <- function(dt, patient) {
-  oTemp <- dt[,c("Open","ErrorMessage")]
+  oTemp <- dt[,c("Open","Status")]
   oTemp$Open <- (oTemp$Open / 60)
   colnames(oTemp)[1] <- "Minutes"
   oTemp$Operation = "Open"
-  #oTemp$ErrorMessage <- ifelse(is.na(oTemp$ErrorMessage), "Open (Success)",oTemp$ErrorMessage)
+  #oTemp$Status <- ifelse(is.na(oTemp$Status), "Open (Success)",oTemp$Status)
   
   opTimes <- oTemp
   ggp <-
     ggplot(opTimes) +
-    geom_histogram(alpha = 0.5, binwidth=0.5, aes(Minutes, fill=ErrorMessage, color=ErrorMessage)
+    geom_histogram(alpha = 0.5, binwidth=0.5, aes(Minutes, fill=Status, color=Status)
                    #, position = 'identity'
                    )
   
@@ -165,7 +193,7 @@ tp1_d1 <- rbind(
 section_dt <- tp1_d1
 section_title <- "Test Patient"
 
-section_dt$ErrorMessage <- as.factor(section_dt$ErrorMessage)
+section_dt$Status <- as.factor(section_dt$Status)
 section_dt <- section_dt[which(section_dt$Search < 30),] # Remove probable outlier/automation mistake
 kable(summarize(section_dt))
 plot_006(section_dt, section_title)
@@ -173,6 +201,8 @@ plot_006(section_dt, section_title)
 #open_hist_006(section_dt, section_title)
 kable(summary(section_dt[,c("StartSearch","Search","Open")]))
 #kable(section_dt[,c("StartSearch","Search","Open")])
+samples_plot_006(section_dt, section_title)
+
 ```
 
 -------------
@@ -193,7 +223,7 @@ rp1_d1 <- rp1_d1[which(rp1_d1$Open < 750),] # Remove probable outlier
 section_dt <- rp1_d1
 section_title <- "Real Patient"
 
-section_dt$ErrorMessage <- as.factor(section_dt$ErrorMessage)
+section_dt$Status <- as.factor(section_dt$Status)
 section_dt <- section_dt[which(section_dt$Search < 30),] # Remove probable outlier/automation mistake
 kable(summarize(section_dt))
 plot_006(section_dt, section_title)
@@ -201,6 +231,8 @@ plot_006(section_dt, section_title)
 #open_hist_006(section_dt, section_title)
 kable(summary(section_dt[,c("StartSearch","Search","Open")]))
 #kable(section_dt[,c("StartSearch","Search","Open")])
+samples_plot_006(section_dt, section_title)
+
 ```
 
 ----------
