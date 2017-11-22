@@ -3,9 +3,9 @@ title: "Clinical Connect Performance"
 author: "Jeremy R. Sellars - Softek Solutions"
 date: "November 22, 2017"
 output:
-  word_document: default
-  pdf_document: default
   html_document: default
+  pdf_document: default
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -34,7 +34,7 @@ library(dplyr)
 
 This report contains information gathered by Softek, using web-automation tooling to drive the Clinical Connect UI, searching for a patient, opening the patient, and waiting for the labs to be available.
 
-The data is from Friday November 18th, through Tuesday November 21st.
+The data is from part of Friday November 18th, through part of Wednesday November 22nd, 2017.
 
 ## Findings
 
@@ -101,6 +101,7 @@ plot_006 <- function(dt, patient) {
     ylab("Seconds") +
     ggtitle("Response Times", patient) +
     scale_x_datetime() +
+    scale_y_continuous(breaks=seq(0, timeout, 60))
     scale_color_manual(values=StatusColors)
   ggp
 }
@@ -118,6 +119,7 @@ samples_plot_006 <- function(dt, patient) {
               color="#FFFFFF",
               position=position_stack(vjust=0.5)) +
     scale_fill_manual(values=StatusColors) +
+    ylab("# of tests") +
     ggtitle("Test results by day", patient)
 }
 
@@ -142,24 +144,29 @@ hist_006 <- function(dt, patient) {
   ggp
 }
 #hist_006(rp1_d1, "Hi")
-
+#dt <- tp1_d1
+#patient <-"hi"
 open_hist_006 <- function(dt, patient) {
-  oTemp <- dt[,c("Open","Status")]
-  oTemp$Open <- (oTemp$Open / 60)
-  colnames(oTemp)[1] <- "Minutes"
-  oTemp$Operation = "Open"
-  #oTemp$Status <- ifelse(is.na(oTemp$Status), "Open (Success)",oTemp$Status)
-  
-  opTimes <- oTemp
-  ggp <-
-    ggplot(opTimes) +
-    geom_histogram(alpha = 0.5, binwidth=0.5, aes(Minutes, fill=Status, color=Status)
-                   #, position = 'identity'
-                   )
-  
-  ggp <- ggp + 
-    ggtitle(paste(patient, " - Open Patient Response Time Histogram"))
-  ggp
+  dt <- dt[which(dt$Status == "Opened Successfully"),c("StartOpen", "Open")]
+  dt <- dt[which(dt$Open <= 100),]
+  dt$StartOpen <- as.factor(gsub(" .*", "", as.POSIXct(dt$StartOpen)))
+  maxSeconds <- 60
+  colorStart <- 100
+  colorDelta <- -120
+  binwidth = 5 # seconds
+
+  suppressWarnings(
+    ggplot(dt, aes(Open, fill=cut(Open, 60))) +
+      geom_histogram(binwidth=binwidth, boundary=0, show.legend = F) +
+      xlab("seconds") +
+      scale_x_continuous(limits=c(0, maxSeconds),
+                         breaks=seq(0, maxSeconds, binwidth * 2),
+                         labels=function(s)paste0(s, "s"))+
+      scale_fill_discrete(h = c(100, 100 + -120 * max(dt$Open) / maxSeconds)) +
+      ylab("# of tests") +
+      facet_wrap(~StartOpen) +
+      ggtitle("How often is it fast vs slow?",
+              paste("OpenPatient response times by day for", patient, "cut into", binwidth, "second chunks")))
 }
 #open_hist_006(section_dt, section_title)
 
@@ -201,7 +208,7 @@ kable(summarize(section_dt))
 samples_plot_006(section_dt, section_title)
 plot_006(section_dt, section_title)
 #hist_006(section_dt, section_title)
-#open_hist_006(section_dt, section_title)
+open_hist_006(section_dt, section_title)
 kable(summary(section_dt[,c("StartSearch","Search","Open")]))
 #kable(section_dt[,c("StartSearch","Search","Open")])
 
@@ -226,7 +233,7 @@ kable(summarize(section_dt))
 samples_plot_006(section_dt, section_title)
 plot_006(section_dt, section_title)
 #hist_006(section_dt, section_title)
-#open_hist_006(section_dt, section_title)
+open_hist_006(section_dt, section_title)
 kable(summary(section_dt[,c("StartSearch","Search","Open")]))
 #kable(section_dt[,c("StartSearch","Search","Open")])
 
