@@ -3,6 +3,7 @@ title: "Clinical Connect Performance"
 author: "Jeremy R. Sellars - Softek Solutions"
 date: "November 22, 2017"
 output:
+  word_document: default
   pdf_document: default
   html_document: default
 ---
@@ -39,7 +40,7 @@ The data is from Friday November 18th, through Tuesday November 21st.
 
 * The ClinicalConnect application seems to be subject to timeouts, during both peak and off-peak hours.
 * The problem may be related to the amount of data being retrieved.  E.g. Labs for All Regional Encounters for the past 180 days may retrieve more data than just the current encounter for the past 90 days.
-* The ClinicalConnect application success/failure behavior seemed to change on Monday November 20th for some time.
+* The ClinicalConnect application success/failure behavior seemed to drasticly improve starting onday November 20th.
 
 \pagebreak
 
@@ -178,8 +179,6 @@ summarize <- function (dt){
 
 Here is the plot, and a statistical summary for the data for each patient.
 
--------------
-
 \pagebreak
 
 ### Real Patient
@@ -199,16 +198,14 @@ section_title <- "Real Patient"
 section_dt$Status <- as.factor(section_dt$Status)
 section_dt <- section_dt[which(section_dt$Search < 30),] # Remove probable outlier/automation mistake
 kable(summarize(section_dt))
+samples_plot_006(section_dt, section_title)
 plot_006(section_dt, section_title)
 #hist_006(section_dt, section_title)
 #open_hist_006(section_dt, section_title)
 kable(summary(section_dt[,c("StartSearch","Search","Open")]))
 #kable(section_dt[,c("StartSearch","Search","Open")])
-samples_plot_006(section_dt, section_title)
 
 ```
-
--------------
 
 \pagebreak
 
@@ -226,12 +223,12 @@ section_title <- "Test Patient"
 section_dt$Status <- as.factor(section_dt$Status)
 section_dt <- section_dt[which(section_dt$Search < 30),] # Remove probable outlier/automation mistake
 kable(summarize(section_dt))
+samples_plot_006(section_dt, section_title)
 plot_006(section_dt, section_title)
 #hist_006(section_dt, section_title)
 #open_hist_006(section_dt, section_title)
 kable(summary(section_dt[,c("StartSearch","Search","Open")]))
 #kable(section_dt[,c("StartSearch","Search","Open")])
-samples_plot_006(section_dt, section_title)
 
 ```
 
@@ -239,7 +236,7 @@ samples_plot_006(section_dt, section_title)
 
 \pagebreak
 
-# Test Method
+# Appendix A - Test Method
 
 The ClinicalConnect web application was automated through Chrome, running on the Panther server in one of LHSC's data centers.
 
