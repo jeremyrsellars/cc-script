@@ -1,0 +1,301 @@
+---
+title: "Clinical Connect Performance"
+author: "Jeremy R. Sellars - Softek Solutions"
+date: "July 6, 2018"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = F)
+knitr::opts_chunk$set(echo = F)
+#install.packages(c("stringi"),type="win.binary")
+#install.packages(c("lubridate"),type="win.binary")
+#install.packages(c("gridExtra"),type="win.binary")
+
+library(chron)
+library(ggplot2)
+library(gridExtra)
+library(lubridate)
+library(knitr)
+```
+
+# Executive Summary
+
+This report contains information gathered by Softek, using web-automation tooling to drive the Clinical Connect UI, searching for a patient, opening the patient, and waiting for the labs to be available.
+
+The data is approximately a week's worth of data from part of Wednesday June 27th, through part of Thursday July 5th, 2018 (a full weekend, a holiday, and 5 business days).  A general comparison is made with similar data gathered and analyzed by Softek in November, 2017.  This latest study focuses on response time differences between Chrome and Internet Explorer. However, more attention was paid to differences between Chrome and Internet Explorer.
+
+## Findings
+
+* The Clinical Connect application no longer seems to exhibit the timeout problems measured in November 2017.  At that time, the application would appear to be fetching data for approximately 10 minutes before timing out.  This is dramatically improved since November and that problem seems to have been fixed.
+* In November, the problem seems to have been related to the amount of data being retrieved.  E.g. When the application is configured to show "Labs for All Regional Encounters for the past 180 days", that retrieves more data than just the "Current encounter for the past 90 days."
+* Median response time is several seconds longer using Internet Explorer than Chrome.
+
+\pagebreak
+
+# Response time-to-glass visualization
+
+```{r login_functions, echo=F}
+parseBrowser <- function(s) ifelse(s == "ie", "Internet Explorer", "Chrome")
+
+parseExcelDate <- function (s) {
+  dtparts = t(as.data.frame(strsplit(as.character(s),' ')))
+  row.names(dtparts) = NULL
+  as.POSIXlt(
+    chron(dates=dtparts[,1],times=dtparts[,2],
+          format=c('m/d/y','h:m:s')), tz="UTC")
+}
+
+login_010 <- function(csv_path) {
+  names_010 <- c("Browser","Instant","LoginSeconds")
+  dt <- read.csv(csv_path, header = F, stringsAsFactors = F)
+  colnames(dt) <- names_010
+  dt$Browser <- as.factor(parseBrowser(dt$Browser))
+  dt$LoginSeconds <- dt$LoginSeconds/1000 # ms -> s
+  dt$InstantLT <- parseExcelDate(dt$Instant)
+  dt$Instant <- as.POSIXct(dt$InstantLT)
+  dt$Day <- weekdays(as.Date(dt$InstantLT))
+  dt$Date <- as.Date(dt$InstantLT)
+  dt$Hour <- hour(dt$InstantLT)
+  dt
+}
+
+login <- login_010("..\\data\\2018-07-05\\login.csv")
+
+```
+
+```{r patient_functions, echo=F}
+#kable(summary(login[,c("Browser","Instant","LoginSeconds")]))
+
+patient_010 <- function(csv_path) {
+  names_010 <- c("Browser","Pin","Instant","SearchSeconds","Instant2","OpenSeconds","Instant3")
+  dt <- read.csv(csv_path, header = F, stringsAsFactors = F)
+  colnames(dt) <- names_010
+  dt$Browser <- as.factor(parseBrowser(dt$Browser))
+  dt$SearchSeconds <- dt$SearchSeconds/1000 # ms -> s
+  dt$OpenSeconds <- dt$OpenSeconds/1000 # ms -> s
+  dt$InstantLT <- parseExcelDate(dt$Instant)
+  dt$Instant <- as.POSIXct(dt$InstantLT)
+  dt$Day <- weekdays(as.Date(dt$InstantLT))
+  dt$Date <- as.Date(dt$InstantLT)
+  dt$Hour <- hour(dt$InstantLT)
+  dt
+}
+
+patient <- patient_010("..\\data\\2018-07-05\\patient.csv")
+```
+
+
+Scatter plots with trendlines compare how long it takes to log in between browsers.
+
+```{r}
+login_scatter <-
+  ggplot(login, aes(x=Instant, y=LoginSeconds, color=Browser)) +
+  geom_point(alpha=0.5, size=0.1) +
+  geom_smooth()
+grid.arrange(nrow=2,
+  login_scatter + ggtitle("Login (Elapsed Seconds)"),
+  login_scatter + ggtitle("Login without outliers (Elapsed Seconds)") + scale_y_continuous(limits=c(0,7)))
+
+#ggplot(login, aes(x=weekdays(as.Date(Instant)), y=LoginSeconds, color=Browser)) + geom_boxplot(position="identity")
+
+#ggplot(login, aes(x=Browser, y=LoginSeconds, color=Browser)) + geom_violin(position="identity")+coord_flip() + facet_wrap("Date")
+
+#ggplot(login, aes(x=Instant, y=LoginSeconds, color=Browser)) + geom_point(shape=1)
+
+#ggplot(login, aes(x=Hour, y=LoginSeconds, color=Browser)) + geom_point()
+```
+
+
+--------
+
+\pagebreak
+
+### Browser Comparison by Operation
+
+These plots show aggregated time by browser and time of day.  8:00 am through 5:59 PM are set off with dashed lines to show busy times of day.
+
+#### Median
+
+* We DO NOT see any significant performance correlation with busy times of day.
+*	Chrome is faster for each measured operation.
+
+```{r}
+aggregate_response_time <- function(dt, field, subfield=NULL, fn=median){
+  op <- gsub("Seconds", "", field)
+  useSub <- length(subfield)>0
+  if(useSub)
+    by <- list(dt$Browser, dt$Hour, dt[,subfield])
+  else
+    by <- list(dt$Browser, dt$Hour)
+
+  agg <- aggregate(dt[,field], by=by, FUN=fn)
+  if(useSub)
+    ns <- c("Browser", "Time", subfield, "Seconds")
+  else
+    ns <- c("Browser", "Time", "Seconds")
+  names(agg) <- ns
+  agg$OperationType <- op
+  if(useSub)
+    agg$Operation <- paste0(op, floor(agg[,subfield]/1000000))
+  else
+    agg$Operation <- op
+  
+  agg[,c("Browser", "Time", "Seconds", "OperationType", "Operation")]
+}
+
+
+response_time_plot <- function(agg, agg_fn_desc="Median"){
+  ggplot(agg, aes(x=Time, y=Seconds, color=Operation)) +
+    geom_line() + 
+    geom_point(aes(shape=OperationType)) +
+    geom_vline(xintercept = c(8,17), linetype = "dashed", colour = "red") +
+    facet_wrap("Browser") +
+    scale_x_continuous(labels=function(s)paste0(s, ":00"), breaks=c(0, 8, 16, 24)) +
+    ggtitle(paste0(agg_fn_desc, " response time by hour of day"))
+}
+#median_response_time(patient, "Search", "Pin")
+
+#median_response_time_plot(median_response_time(login, "LoginSeconds", NULL))
+
+median_response_time_for_all_ops <-
+  rbind(aggregate_response_time(login, "LoginSeconds", NULL),
+        aggregate_response_time(patient, "SearchSeconds", "Pin"),
+        aggregate_response_time(patient, "OpenSeconds", "Pin"))
+response_time_plot(median_response_time_for_all_ops)
+```
+
+This second plot adds a column to show how much slower IE is than Chrome: `(Chrome.Median - IE.Median)`
+
+```{r, fig.width=12}
+
+# Difference
+subtract_by <- function(median_response_time_for_all_ops, a_browser, b_browser, op_field, by){
+  a <- median_response_time_for_all_ops[which(median_response_time_for_all_ops$Browser==a_browser),]
+  b <- median_response_time_for_all_ops[which(median_response_time_for_all_ops$Browser==b_browser),]
+  b$Seconds <- -b[,op_field]
+  rb <- rbind(a,b)
+  agg = aggregate(rb[, op_field], by=rb[,by], FUN=sum)
+  names(agg)[which(names(agg)=="x")] <- op_field
+  agg
+}
+
+ie_longer_median_response_time_for_all_ops <-
+  subtract_by(median_response_time_for_all_ops,
+              "Internet Explorer", "Chrome",
+              "Seconds",
+              c("Time", "OperationType", "Operation"))
+ie_longer_median_response_time_for_all_ops$Browser <- "IE slower than Chrome"
+
+response_time_plot(rbind(median_response_time_for_all_ops, ie_longer_median_response_time_for_all_ops))
+```
+
+\pagebreak
+
+#### Standard Deviation
+
+* This visualization shows significant performance correlation with the busy times of day.  Much of the worst variance occurs during those busy times.
+* The browser doesn't seem to demonstrate much of a difference.  This suggests that network, application server, and overall load are likely to be factors in response time variance, rather than the browser.
+
+```{r}
+stddev_response_time_for_all_ops <-
+  rbind(aggregate_response_time(login, "LoginSeconds", NULL, sd),
+        aggregate_response_time(patient, "SearchSeconds", "Pin", sd),
+        aggregate_response_time(patient, "OpenSeconds", "Pin", sd))
+response_time_plot(stddev_response_time_for_all_ops, "Standard Deviation of ")
+```
+
+---------
+
+\pagebreak
+
+### Summarized Response Times
+
+This section treats each of the operations as a user interaction. Proportionally, this represents 1 login, 3 searches, and 3 opened patients showing 180 days of lab data (see test method appendix).
+
+Internet Explorer is slower in every respect, except perhaps the "long tail".
+
+```{r}
+all_response_times <-
+  rbind(data.frame(list(Browser=login[,"Browser"], Seconds=login[,"LoginSeconds"])),
+        data.frame(list(Browser=patient[,"Browser"], Seconds=patient[,"SearchSeconds"])),
+        data.frame(list(Browser=patient[,"Browser"], Seconds=patient[,"OpenSeconds"])))
+
+summarize_all_response_times <- function(browser){
+  summ <- summary(all_response_times[which(all_response_times$Browser==browser),"Seconds"])[c("1st Qu.","Median","Mean","3rd Qu.","Max.")]
+  summ$Browser=browser
+  summ$"1st Qu." <- round(summ$"1st Qu.", 1)
+  summ$"Median" <- round(summ$"Median", 1)
+  summ$"Mean" <- round(summ$"Mean", 1)
+  summ$"3rd Qu." <- round(summ$"3rd Qu.", 1)
+  summ$"Max." <- round(summ$"Max.", 1)
+  summ
+  #summ[,c("Browser", "1st Qu.","Median","Mean","3rd Qu.","Max.")]
+}
+summarized_all_response_times <-
+  suppressWarnings(
+    rbind(summarize_all_response_times("Chrome"),
+          summarize_all_response_times("Internet Explorer")))
+kable(summarized_all_response_times)
+```
+
+The following is a visualization of the above statistics table.  The middle line of the box and whiskers plot is the median, which means that half of the operations took longer and 50% were shorter.  The top of the boxes represent the 75% mark, meaning that 3/4ths (75%) of the interactions completed by the 3rd Quartile.
+
+```{r, fig.height=3}
+ggplot(all_response_times, aes(x=Browser, y=Seconds, color=Browser)) +
+  geom_jitter(aes(colour = Browser, x = Browser), 
+              position = position_jitter(width = .25), alpha = 0.1) +
+  geom_boxplot(outlier.colour = NA)
+```
+
+Finally, this show a density plot, showing the proportion of operations that finished by elapsed time.  Preferably, the colored density would be all the way at the left near 0 seconds of elapsed time.
+
+```{r, fig.height=2}
+ggplot(all_response_times, aes(Seconds, color=Browser, fill=Browser)) + geom_density(alpha=0.5)
+```
+
+
+\pagebreak
+
+# Appendix A - Test Method
+
+The Clinical Connect web application was automated, running on the Panther server in one of LHSC's data centers.  The November 2017 screen images are reused here since they refer to the "test patient", and don't contain clinical information for an actual person.
+
+1. Login.
+  * ![Login](..\\data\\AllRegionalEncounters_180d\\tp.0.login.11-17-2017 14-56-05.png)
+2. Search for a patient by PIN.
+  * ![Search](..\\data\\AllRegionalEncounters_180d\\tp.1.patients.11-17-2017 14-56-05.png)
+3. Open patient.  Click through the not-my-patient override screen.
+  * (Not shown)
+4. Showing Labs.
+  * ![Labs](..\\data\\AllRegionalEncounters_180d\\tp.3.labs.11-17-2017 14-56-05.png)
+5. Repeat steps 2-4 for remaining patients.  (New for 2018)
+6. Log out using Logout button.  (New for 2018)
+7. Close browser.
+
+The labs were set through settings to 180 days of All Regional Encounters, as shown here:
+
+![Settings](..\\data\\AllRegionalEncounters_180d\\AllRegionalEncounters_180d.png)
+
+## Differences Between Studies
+
+* A different list of patients were chosen.
+* In contrast to the study in November 2017, this study automated both Chrome and Internet Explorer 11 browsers.  The same sliding window of time was used (6 months), however, naturally, there could be new exams and some older exams would no longer fit within the 6-month window.
+* In order to provide a good comparison between IE and Chrome, the new robots were written for both Chrome and Internet Explorer (based off of the November 2017 version), using a library that worked with both browsers.  At each sample, a browser was randomly chosen to be first so that no bias would be introduced by always picking one to be first.
+* In the 2018 study, the robot would login once, then open each of the patients in the same order every time.  In the 2017 study, it would log in once per patient.
+* The 2018 robots explicitly log out using the menu in Clinical Connect.
+
+\pagebreak
+
+# Appendix B - Summarized Data
+
+This section shows some bare statics of the gathered data.  For example, the number of samples per browser.
+
+### Login
+`r kable(summary(login[,c("Browser","Instant","LoginSeconds")]))`
+
+### Search and Open Patient
+`r kable(summary(patient[,c("Browser","Instant","SearchSeconds", "OpenSeconds")]))`
