@@ -3,8 +3,8 @@ title: "Clinical Connect Performance"
 author: "Jeremy R. Sellars - Softek Solutions"
 date: "July 6, 2018"
 output:
-  word_document: default
   html_document: default
+  word_document: default
   pdf_document: default
 ---
 
@@ -33,6 +33,7 @@ The data is approximately a week's worth of data from part of Wednesday June 27t
 * The Clinical Connect application no longer seems to exhibit the timeout problems measured in November 2017.  At that time, the application would appear to be fetching data for approximately 10 minutes before timing out.  This is dramatically improved since November and that problem seems to have been fixed.
 * In November, the problem seems to have been related to the amount of data being retrieved.  E.g. When the application is configured to show "Labs for All Regional Encounters for the past 180 days", that retrieves more data than just the "Current encounter for the past 90 days."
 * Median response time is several seconds longer using Internet Explorer than Chrome.
+* Unfortunately, no automated testing of PowerChart opening Clinical Connect could be performed.  A brief section is devoted to a "best-guess" estimate of average time to open a patient in Clinical Connect from PowerChart.
 
 \pagebreak
 
@@ -118,12 +119,15 @@ grid.arrange(nrow=2,
 
 These plots show aggregated time by browser and time of day.  8:00 am through 5:59 PM are set off with dashed lines to show busy times of day.
 
+The 7 operation types are Login, 3 different patients searched, and 3 patients opened to show 180 days of labs.  The number is a substring of the MRN, to avoid showing patient identifiers.
+
+
 #### Median
 
 * We DO NOT see any significant performance correlation with busy times of day.
 *	Chrome is faster for each measured operation.
 
-```{r}
+```{r fig.height=4}
 aggregate_response_time <- function(dt, field, subfield=NULL, fn=median){
   op <- gsub("Seconds", "", field)
   useSub <- length(subfield)>0
@@ -140,7 +144,7 @@ aggregate_response_time <- function(dt, field, subfield=NULL, fn=median){
   names(agg) <- ns
   agg$OperationType <- op
   if(useSub)
-    agg$Operation <- paste0(op, floor(agg[,subfield]/1000000))
+    agg$Operation <- paste0(op, agg[,subfield])
   else
     agg$Operation <- op
   
@@ -220,9 +224,9 @@ Internet Explorer is slower in every respect, except perhaps the "long tail".
 
 ```{r}
 all_response_times <-
-  rbind(data.frame(list(Browser=login[,"Browser"], Seconds=login[,"LoginSeconds"])),
-        data.frame(list(Browser=patient[,"Browser"], Seconds=patient[,"SearchSeconds"])),
-        data.frame(list(Browser=patient[,"Browser"], Seconds=patient[,"OpenSeconds"])))
+  rbind(data.frame(list(Browser=login  [,"Browser"], OperationType="Login", Seconds=login  [,"LoginSeconds"])),
+        data.frame(list(Browser=patient[,"Browser"], OperationType="Search", Seconds=patient[,"SearchSeconds"])),
+        data.frame(list(Browser=patient[,"Browser"], OperationType="Open", Seconds=patient[,"OpenSeconds"])))
 
 summarize_all_response_times <- function(browser){
   summ <- summary(all_response_times[which(all_response_times$Browser==browser),"Seconds"])[c("1st Qu.","Median","Mean","3rd Qu.","Max.")]
@@ -257,6 +261,40 @@ Finally, this show a density plot, showing the proportion of operations that fin
 ggplot(all_response_times, aes(Seconds, color=Browser, fill=Browser)) + geom_density(alpha=0.5)
 ```
 
+
+---------
+
+\pagebreak
+
+# PowerChart Integration
+
+Cerner PowerChart is able to open Clinical Connect to a specific patient in Internet Explorer.  Softek was asked to measure this time, if possible.  Unfortunately, we didn't find a way to do this because of the secure nature of the URL-generation algorithm.  The generated URLs seemed to be single-use, so they could not be reused for automated measurement.
+
+### Discussion
+
+Opening a patient from Cerner PowerChart seemed to resemble the operations of logging in and opening the patient (the first and third operation that were able to be measured through automation).  Here we estimate the amount of time required to open a patient through the PowerChart-Clinical Connect integration as `Login Time + Open Time`.
+
+### Estimation
+
+```{r}
+pc_mean <- as.data.frame(aggregate(all_response_times$Seconds, by=all_response_times[,c("Browser","OperationType")], FUN=mean))
+pc_mean <- pc_mean[which(pc_mean$OperationType != "Search"),]
+pc_mean <- aggregate(pc_mean$x, by=list(pc_mean[,c("Browser")]), FUN=sum)
+pc_mean$x <- round(pc_mean$x, 1)
+names(pc_mean) <- c("Browser", "Estimated Seconds (Mean)")
+#kable(pc_mean)
+
+pc_var <- as.data.frame(aggregate(all_response_times$Seconds, by=all_response_times[,c("Browser","OperationType")], FUN=var))
+pc_var <- pc_var[which(pc_var$OperationType != "Search"),]
+pc_var <- aggregate(pc_var$x, by=list(pc_var[,c("Browser")]), FUN=sum)
+pc_var$x <- round(sqrt(pc_var$x), 1)
+names(pc_var) <- c("Browser", "Estimated Standard Deviation")
+#kable(pc_var)
+
+kable(cbind(pc_mean, pc_var)[,c(1,2,4)])
+```
+
+Bear in mind that this assumes the settings described in the Test Method appendix, below.  Of course users may choose more than only lab data, or less than 180 days, etc..
 
 \pagebreak
 
