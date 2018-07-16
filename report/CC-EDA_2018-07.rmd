@@ -3,9 +3,8 @@ title: "Clinical Connect Performance"
 author: "Jeremy R. Sellars - Softek Solutions"
 date: "July 6, 2018"
 output:
-  html_document: default
   word_document: default
-  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -337,3 +336,95 @@ This section shows some bare statics of the gathered data.  For example, the num
 
 ### Search and Open Patient
 `r kable(summary(patient[,c("Browser","Instant","SearchSeconds", "OpenSeconds")]))`
+
+--------------
+
+\pagebreak
+
+# Appendix C - Search Response Time Comparison Between Studies
+
+### Search by PIN Operation
+
+This is a best guess on comparing the performance of the Search Patient step (by PIN in the header search box).  It compares the data gathered from Chrome automation from the two studies (in November 2017, and July, 2018).
+
+```{r}
+open_006 <- function(csv_path) {
+  names_006 <- c("StartSearch","Search","StartOpen","Open","EndOpen", "screenshot", "Status", "Blank1", "Blank")
+  dt <- read.csv(csv_path, header = F, stringsAsFactors = F)
+  colnames(dt) <- names_006
+  dt$Search <- dt$Search/1000 # ms -> s
+  dt$Open <- dt$Open/1000 # ms -> s
+  dt$StartSearch <- parseExcelDate(dt$StartSearch)
+  dt$StartOpen <- parseExcelDate(dt$StartOpen)
+  dt$EndOpen <- parseExcelDate(dt$EndOpen)
+  dt$Status <- gsub(" ?[-.].*", "", dt$Status, perl=T)
+  dt$Status <- ifelse(is.na(dt$Status), "", dt$Status)
+  dt$Status <- ifelse(dt$Status == "", "Opened Successfully", dt$Status)
+
+  dt <- dt[,c("StartSearch","Search","StartOpen","Open","EndOpen", "Status")]
+}
+
+patient_2017 <- rbind(
+  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\rp1.csv"),
+  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\part2\\rp1.csv"),
+  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\tp1.csv"),
+  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\part2\\tp1.csv"))
+patient_2017 <- patient_2017[which(patient_2017$Open < 750),c("StartSearch", "Search")] # Remove probable outlier
+names(patient_2017) <- c("Instant", "SearchSeconds")
+
+
+patient_all <- rbind(
+  patient[which(patient$Browser == "Chrome"), c("Instant", "SearchSeconds")],
+  patient_2017
+)
+patient_all$Year <- year(patient_all$Instant)
+patient_all$Hour <- hour(patient_all$Instant)
+patient_all$Browser <- "Chrome"
+
+response_time_plot(aggregate_response_time(patient_all, "SearchSeconds", "Year", mean)) +
+  ggtitle("Mean response time by hour of day")
+
+```
+
+**Note: ** The patients used for the study are different.  In the "Browser Comparison by Operation" of the report, we do see consistent differences in the amount of time to search for different patients.
+
+#### Findings
+
+Generally, it appears that the search result timings have improved.  This is a small fraction of the overall workflow.
+
+#### Search Timing Results from 2017
+
+`r kable(summary(patient_2017))`
+
+#### Search Timing Results from 2018
+
+`r kable(summary(patient[which(patient$Browser == "Chrome"), c("Instant", "SearchSeconds")]))`
+
+### Open Patient Operation
+
+Data collected between 2017 and 2018 for opening a patient is too different to be relevant because of the differences in data retrieved.  No useful comparison can be made.
+
+Perhaps a comparison could be made if the response time was normalized (divided by number of labs retrieved), a comparison could be useful.  No such data is available from the 2017 study.
+
+Even if the additional data were available from 2017, this would still only represent a particular type of usage (since it retrieves data, but not data for other panels of the user interface).
+
+#### Findings
+
+It is noteworthy that the "Max" time to open was significantly slower in 2017.  This is further evidence that the Clinical Connect "long tail" has improved dramatically. 
+
+#### Open "Real" Patient Timing Results from 2017
+
+```{r}
+rp_2017 <- rbind(
+  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\rp1.csv"),
+  open_006("..\\data\\AllRegionalEncounters_180d_0.0.6\\part2\\rp1.csv"))
+rp_2017 <- rp_2017[which(rp_2017$Open < 750),c("StartOpen", "Open")] # Remove probable outlier
+names(rp_2017) <- c("Instant", "OpenSeconds")
+kable(summary(rp_2017))
+```
+
+#### Open Patient Timing Results from 2018
+
+```{r}
+kable(summary(patient[which(patient$Browser == "Chrome"), c("Instant", "OpenSeconds")]))
+```
