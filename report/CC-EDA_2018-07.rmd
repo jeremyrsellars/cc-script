@@ -10,6 +10,10 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(warning = F, message = F)
 knitr::opts_chunk$set(echo = F)
+knitr::opts_chunk$set(fig.width=10)
+knitr::opts_chunk$set(fig.height=8)
+knitr::opts_chunk$set(fig.path = "2018-07-images/")
+#knitr::opts_chunk$set(dev="svg") # This can be used to generate SVG files, but not in Word format.
 #install.packages(c("stringi"),type="win.binary")
 #install.packages(c("lubridate"),type="win.binary")
 #install.packages(c("gridExtra"),type="win.binary")
@@ -91,11 +95,12 @@ patient <- patient_010("..\\data\\2018-07-05\\patient.csv")
 
 Scatter plots with trendlines compare how long it takes to log in between browsers.
 
-```{r}
+```{r _1_LoginScatter}
 login_scatter <-
   ggplot(login, aes(x=Instant, y=LoginSeconds, color=Browser)) +
   geom_point(alpha=0.5, size=0.1) +
-  geom_smooth()
+  geom_smooth() +
+  theme(axis.title.x = element_blank())
 grid.arrange(nrow=2,
   login_scatter + ggtitle("Login (Elapsed Seconds)"),
   login_scatter + ggtitle("Login without outliers (Elapsed Seconds)") + scale_y_continuous(limits=c(0,7)))
@@ -126,7 +131,7 @@ The 7 operation types are Login, 3 different patients searched, and 3 patients o
 * We DO NOT see any significant performance correlation with busy times of day.
 *	Chrome is faster for each measured operation.
 
-```{r fig.height=4}
+```{r _2_ResponseTime}
 aggregate_response_time <- function(dt, field, subfield=NULL, fn=median){
   op <- gsub("Seconds", "", field)
   useSub <- length(subfield)>0
@@ -173,7 +178,7 @@ response_time_plot(median_response_time_for_all_ops)
 
 This second plot adds a column to show how much slower IE is than Chrome: `(Chrome.Median - IE.Median)`
 
-```{r, fig.width=12}
+```{r _3_ResponseTime_IE_Slower, fig.width=12}
 
 # Difference
 subtract_by <- function(median_response_time_for_all_ops, a_browser, b_browser, op_field, by){
@@ -203,7 +208,7 @@ response_time_plot(rbind(median_response_time_for_all_ops, ie_longer_median_resp
 * This visualization shows significant performance correlation with the busy times of day.  Much of the worst variance occurs during those busy times.
 * The browser doesn't seem to demonstrate much of a difference.  This suggests that network, application server, and overall load are likely to be factors in response time variance, rather than the browser.
 
-```{r}
+```{r _4_ResponseTime_StdDev}
 stddev_response_time_for_all_ops <-
   rbind(aggregate_response_time(login, "LoginSeconds", NULL, sd),
         aggregate_response_time(patient, "SearchSeconds", "Pin", sd),
@@ -247,7 +252,7 @@ kable(summarized_all_response_times)
 
 The following is a visualization of the above statistics table.  The middle line of the box and whiskers plot is the median, which means that half of the operations took longer and 50% were shorter.  The top of the boxes represent the 75% mark, meaning that 3/4ths (75%) of the interactions completed by the 3rd Quartile.
 
-```{r, fig.height=3}
+```{r _5_BrowserBoxPlot}
 ggplot(all_response_times, aes(x=Browser, y=Seconds, color=Browser)) +
   geom_jitter(aes(colour = Browser, x = Browser), 
               position = position_jitter(width = .25), alpha = 0.1) +
@@ -256,7 +261,7 @@ ggplot(all_response_times, aes(x=Browser, y=Seconds, color=Browser)) +
 
 Finally, this show a density plot, showing the proportion of operations that finished by elapsed time.  Preferably, the colored density would be all the way at the left near 0 seconds of elapsed time.
 
-```{r, fig.height=2}
+```{r _6_BrowserHistogram}
 ggplot(all_response_times, aes(Seconds, color=Browser, fill=Browser)) + geom_density(alpha=0.5)
 ```
 
@@ -347,7 +352,7 @@ This section shows some bare statics of the gathered data.  For example, the num
 
 This is a best guess on comparing the performance of the Search Patient step (by PIN in the header search box).  It compares the data gathered from Chrome automation from the two studies (in November 2017, and July, 2018).
 
-```{r}
+```{r _7_AppendixC}
 open_006 <- function(csv_path) {
   names_006 <- c("StartSearch","Search","StartOpen","Open","EndOpen", "screenshot", "Status", "Blank1", "Blank")
   dt <- read.csv(csv_path, header = F, stringsAsFactors = F)
